@@ -219,7 +219,7 @@ public class FruitController {
 2021-04-12 17:46:39.051  INFO 22548 --- [nio-8080-exec-3] c.j.c.component.FruitInfoUtil            :  과일 파는 곳의 ID: 1, 지점 이름 : JSH, 지점 주소 : Seoul
 ```
 
-+ Spring에서 애플리케이션을 실행 시 @Service나, @Component가 붙은 클래스들을 스캔해서 IoC 컨테이너에 등록해주는 과정이 있습니다.
++ Spring에서 Application 실행 시 @Service, @Component가 붙은 Class들을 Scan해서 IoC Container에 등록해주는 과정
   + @Service Annotation
 ```java
 @Target({ElementType.TYPE})
@@ -233,8 +233,8 @@ public @interface Service {
     String value() default "";
 }
 ```
-+ Service 어노테이션은, Target이 TYPE으로 지정되어 있습니다. Class나 Interface를 타겟으로 삼는다는 의미 입니다. 
-  또한 같은 패키지인org.springframework.stereotype 의 Component 어노테이션을 쓰고 있는걸 볼 수 있습니다.
++ Service Annotation은, Target이 TYPE으로 지정되어 있음. Class나 Interface를 Target으로 삼는다는 의미
+  또한 같은 패키지인 org.springframework.stereotype 의 Component Annotation이을 쓰고 있는걸 볼 수 있음
   + @Component Annotation
 ```java
 @Target({ElementType.TYPE})
@@ -243,5 +243,44 @@ public @interface Service {
 @Indexed
 public @interface Component {
     String value() default "";
+}
+```
+
++ Spring 에서는 @Component, @Service, @Controller등 Annotation이 사용 된 Class는 Bean으로 등록
+  + doScan() 메소드가 ClassPath에 있는 Package의 모든 Class를 읽어 Annotation이 붙은 Class를 처리 해 주는 Method.
+```java
+/**
+ * Perform a scan within the specified base packages,
+ * returning the registered bean definitions.
+ * <p>This method does <i>not</i> register an annotation config processor
+ * but rather leaves this up to the caller.
+ * @param basePackages the packages to check for annotated classes
+ * @return set of beans registered if any for tooling registration purposes (never {@code null})
+ */
+protected Set<BeanDefinitionHolder> doScan(String... basePackages) {
+    Assert.notEmpty(basePackages, "At least one base package must be specified");
+    Set<BeanDefinitionHolder> beanDefinitions = new LinkedHashSet<>();
+    for (String basePackage : basePackages) {
+        Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
+        for (BeanDefinition candidate : candidates) {
+            ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
+            candidate.setScope(scopeMetadata.getScopeName());
+            String beanName = this.beanNameGenerator.generateBeanName(candidate, this.registry);
+            if (candidate instanceof AbstractBeanDefinition) {
+                postProcessBeanDefinition((AbstractBeanDefinition) candidate, beanName);
+            }
+            if (candidate instanceof AnnotatedBeanDefinition) {
+                AnnotationConfigUtils.processCommonDefinitionAnnotations((AnnotatedBeanDefinition) candidate);
+            }
+            if (checkCandidate(beanName, candidate)) {
+                BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
+                definitionHolder =
+                        AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
+                beanDefinitions.add(definitionHolder);
+                registerBeanDefinition(definitionHolder, this.registry);
+            }
+        }
+    }
+    return beanDefinitions;
 }
 ```
